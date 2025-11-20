@@ -3,171 +3,160 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+# -----------------------------------------------------------
+# App Title + Config
+# -----------------------------------------------------------
 st.set_page_config(
     page_title="City Mobility & Pollution Insights",
     page_icon="🚦",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# -----------------------------------------------------------
-# App Title
-# -----------------------------------------------------------
 st.title("🚦 City Mobility & Pollution Insights Platform")
 st.write("Upload a traffic–pollution dataset to explore insights.")
 
 # -----------------------------------------------------------
 # Upload Section
 # -----------------------------------------------------------
-uploaded_file = st.file_uploader("Upload CSV Dataset", type=["csv"])
+uploaded_file = st.file_uploader("📤 Upload CSV Dataset", type=["csv"])
 
 if uploaded_file is not None:
+
     df = pd.read_csv(uploaded_file)
 
     st.subheader("📌 Raw Dataset Preview")
-    st.dataframe(df.head())
+    st.dataframe(df.head(10))
 
-    # -------------------------------------------------------
-    # Data Cleaning
-    # -------------------------------------------------------
-    st.subheader("🧹 Data Cleaning & Preparation")
+    st.write("---")
 
-    # Convert datetime if exists
-    if 'datetime' in df.columns:
-        df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
+    # -----------------------------------------------------------
+    # CLICKABLE EXPANDERS
+    # -----------------------------------------------------------
 
-    # Strip spaces in string columns
-    for col in df.select_dtypes(include="object").columns:
-        df[col] = df[col].astype(str).str.strip()
+    # -----------------------------------------------------------
+    # 1. DATA CLEANING & PREPARATION
+    # -----------------------------------------------------------
+    with st.expander("🧹 1. Data Cleaning & Preparation (Click to Expand)"):
+        
+        st.write("### 🔧 Transformation Steps Applied:")
 
-    # Fill missing values
-    df = df.fillna(method='ffill').fillna(method='bfill')
+        # Convert datetime
+        if 'datetime' in df.columns:
+            st.write("- Converting `datetime` to proper timestamps")
+            df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
 
-    st.write("✔ Data cleaned successfully!")
+        # Trim strings
+        st.write("- Stripping extra spaces in string columns")
+        for col in df.select_dtypes(include="object").columns:
+            df[col] = df[col].astype(str).str.strip()
+        
+        # Missing values
+        st.write("- Forward & backward fill missing values")
+        df = df.fillna(method='ffill').fillna(method='bfill')
 
-    # -------------------------------------------------------
-    # Feature Engineering
-    # -------------------------------------------------------
-    if 'datetime' in df.columns:
-        df['hour'] = df['datetime'].dt.hour
-        df['day'] = df['datetime'].dt.day_name()
-        df['month'] = df['datetime'].dt.month
+        # Feature Engineering
+        st.write("- Extracting `hour`, `day`, and `month` from datetime")
+        if 'datetime' in df.columns:
+            df['hour'] = df['datetime'].dt.hour
+            df['day'] = df['datetime'].dt.day_name()
+            df['month'] = df['datetime'].dt.month
 
-    # -------------------------------------------------------
-    # Traffic & Pollution Overview
-    # -------------------------------------------------------
-    if {'traffic', 'pollution'}.issubset(df.columns):
-        st.subheader("📈 Traffic & Pollution Overview")
+        st.success("Data Cleaning Completed")
+        st.dataframe(df.head())
 
-        fig, ax = plt.subplots()
-        ax.plot(df['traffic'], label='Traffic')
-        ax.plot(df['pollution'], label='Pollution')
-        ax.legend()
-        st.pyplot(fig)
+    st.write("---")
 
-    # -------------------------------------------------------
-    # 1. How do traffic patterns relate to pollution?
-    # -------------------------------------------------------
-    if {'traffic', 'pollution'}.issubset(df.columns):
-        st.subheader("🔍 How Do Traffic Patterns Relate To Pollution?")
+    # -----------------------------------------------------------
+    # 2. Worst Time of Day & Worst 5 Areas
+    # -----------------------------------------------------------
+    with st.expander("⏱ 2. Worst Time of Day & Worst 5 Areas (Click to Expand)"):
 
-        fig, ax = plt.subplots()
-        ax.scatter(df['traffic'], df['pollution'])
-        ax.set_xlabel("Traffic Level")
-        ax.set_ylabel("Pollution Level")
-        ax.set_title("Traffic vs Pollution Relationship")
-        st.pyplot(fig)
+        if 'hour' in df.columns and 'traffic' in df.columns:
 
-        corr = df['traffic'].corr(df['pollution'])
-        st.write(f"📌 Correlation: **{corr:.2f}**")
+            st.write("### 🔥 Worst Hours Based on Traffic")
+            hourly = df.groupby('hour')[['traffic', 'pollution']].mean()
 
-    # -------------------------------------------------------
-    # 2. Does rain reduce traffic but not pollution?
-    # -------------------------------------------------------
-    if 'rain' in df.columns:
-        st.subheader("🌧 Rain Impact Analysis")
+            st.dataframe(hourly.sort_values('traffic', ascending=False).head())
 
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.write("📉 Rain vs Traffic")
             fig, ax = plt.subplots()
-            ax.scatter(df['rain'], df['traffic'])
-            ax.set_xlabel("Rainfall")
-            ax.set_ylabel("Traffic")
+            hourly.plot(kind='bar', ax=ax)
+            ax.set_title("Hourly Traffic & Pollution")
             st.pyplot(fig)
 
-        with col2:
-            st.write("💨 Rain vs Pollution")
+        if 'area' in df.columns:
+
+            st.write("### 🚨 Worst 5 Areas by Traffic & Pollution")
+            area_stats = df.groupby('area')[['traffic', 'pollution']].mean()
+            worst_areas = area_stats.sort_values(by='traffic', ascending=False).head(5)
+
+            st.dataframe(worst_areas)
+
+            fig2, ax2 = plt.subplots()
+            worst_areas.plot(kind='bar', ax=ax2)
+            ax2.set_title("Worst 5 Areas Based on Traffic")
+            st.pyplot(fig2)
+
+    st.write("---")
+
+    # -----------------------------------------------------------
+    # 3. WEATHER IMPACT ANALYSIS
+    # -----------------------------------------------------------
+    with st.expander("🌧 3. Weather Impact Analysis (Click to Expand)"):
+
+        if 'rain' in df.columns:
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.write("### 🌧 Rain vs Traffic")
+                fig, ax = plt.subplots()
+                ax.scatter(df['rain'], df['traffic'])
+                ax.set_xlabel("Rainfall")
+                ax.set_ylabel("Traffic")
+                st.pyplot(fig)
+
+            with col2:
+                st.write("### 🌧 Rain vs Pollution")
+                fig, ax = plt.subplots()
+                ax.scatter(df['rain'], df['pollution'])
+                ax.set_xlabel("Rainfall")
+                ax.set_ylabel("Pollution")
+                st.pyplot(fig)
+
+    st.write("---")
+
+    # -----------------------------------------------------------
+    # EXTRA: VISUALIZATION GALLERY (3+ Charts)
+    # -----------------------------------------------------------
+    with st.expander("📊 Visualization Gallery (3+ Charts) – Click to View"):
+
+        st.write("### 📈 Overview of Traffic vs Pollution Over Time")
+
+        if {'traffic','pollution'}.issubset(df.columns):
             fig, ax = plt.subplots()
-            ax.scatter(df['rain'], df['pollution'])
-            ax.set_xlabel("Rainfall")
-            ax.set_ylabel("Pollution")
+            ax.plot(df['traffic'], label='Traffic')
+            ax.plot(df['pollution'], label='Pollution')
+            ax.legend()
             st.pyplot(fig)
 
-    # -------------------------------------------------------
-    # 3. Worst Time of the Day & Worst 5 Areas
-    # -------------------------------------------------------
-    st.subheader("⏱ Worst Time of Day & Worst 5 Areas")
-
-    if 'hour' in df.columns:
-        hourly = df.groupby('hour')[['traffic', 'pollution']].mean()
-        st.write("### Worst Hours (Sorted by Traffic):")
-        st.dataframe(hourly.sort_values('traffic', ascending=False).head())
-
+        st.write("### 📉 Traffic Distribution")
         fig, ax = plt.subplots()
-        hourly.plot(kind='bar', ax=ax)
-        ax.set_title("Hourly Traffic & Pollution")
+        df['traffic'].plot(kind='hist', bins=30, ax=ax)
         st.pyplot(fig)
 
-    if 'area' in df.columns:
-        area_stats = df.groupby('area')[['traffic', 'pollution']].mean()
-        worst_areas = area_stats.sort_values('traffic', ascending=False).head(5)
+        st.write("### 🗺 Area-wise Pollution Levels")
+        if 'area' in df.columns:
+            area_plot = df.groupby('area')['pollution'].mean()
 
-        st.write("### 🚨 Worst 5 Areas by Traffic")
-        st.dataframe(worst_areas)
+            fig, ax = plt.subplots()
+            area_plot.plot(kind='bar', ax=ax)
+            st.pyplot(fig)
 
-        fig, ax = plt.subplots()
-        worst_areas.plot(kind='bar', ax=ax)
-        ax.set_title("Worst Areas (Top 5)")
-        st.pyplot(fig)
+    st.write("---")
 
-    # -------------------------------------------------------
-    # Transport Mode Classification (If Available)
-    # -------------------------------------------------------
-    if 'transport_mode' in df.columns:
-        st.subheader("🚌 Transport Mode Insights")
-
-        mode_counts = df['transport_mode'].value_counts()
-
-        fig, ax = plt.subplots()
-        mode_counts.plot(kind="pie", autopct='%1.1f%%', ax=ax)
-        ax.set_ylabel("")
-        ax.set_title("Transport Mode Distribution")
-        st.pyplot(fig)
-
-    # -------------------------------------------------------
-    # Weather Impact Analysis
-    # -------------------------------------------------------
-    st.subheader("🌦 Weather Impact Analysis")
-
-    if {'rain', 'traffic'}.issubset(df.columns):
-        st.write("### Rain vs Traffic Trend")
-        fig, ax = plt.subplots()
-        ax.plot(df['rain'], label="Rain")
-        ax.plot(df['traffic'], label="Traffic")
-        ax.legend()
-        st.pyplot(fig)
-
-    if {'rain', 'pollution'}.issubset(df.columns):
-        st.write("### Rain vs Pollution Trend")
-        fig, ax = plt.subplots()
-        ax.plot(df['rain'], label="Rain")
-        ax.plot(df['pollution'], label="Pollution")
-        ax.legend()
-        st.pyplot(fig)
-
+    st.success("App Loaded Successfully ✔")
 else:
     st.info("👆 Upload a CSV file to begin analysis.")
+
 
 
