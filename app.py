@@ -3,6 +3,13 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+st.set_page_config(
+    page_title="City Mobility & Pollution Insights",
+    page_icon="🚦",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 # -----------------------------------------------------------
 # App Title
 # -----------------------------------------------------------
@@ -162,4 +169,5 @@ if uploaded_file is not None:
 
 else:
     st.info("👆 Upload a CSV file to begin analysis.")
+
 
