@@ -1,171 +1,125 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 
-# -----------------------------------------------------------
-# App Configuration
-# -----------------------------------------------------------
-st.set_page_config(
-    page_title="City Mobility & Pollution Insights",
-    page_icon="🚦",
-    layout="wide"
-)
+st.set_page_config(page_title="Traffic & Pollution Insights", layout="wide")
 
-st.title("🚦 City Mobility & Pollution Insights Platform")
-st.write("Upload a traffic–pollution dataset to explore insights.")
+st.title("🚦 Traffic • Weather • Pollution Insights App")
 
-# -----------------------------------------------------------
-# Upload Section
-# -----------------------------------------------------------
-uploaded_file = st.file_uploader("📤 Upload CSV Dataset", type=["csv"])
+st.write("Upload the traffic dataset to begin.")
 
-# Utility function to check columns safely
-def has_columns(df, cols):
-    return all(col in df.columns for col in cols)
+uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 
-if uploaded_file is not None:
-
+if uploaded_file:
     df = pd.read_csv(uploaded_file)
 
-    st.subheader("📌 Raw Dataset Preview")
-    st.dataframe(df.head(10))
-    st.write("---")
+    st.success("Dataset successfully loaded!")
 
-    # -----------------------------------------------------------
-    # 1. DATA CLEANING & PREPARATION (CLICKABLE)
-    # -----------------------------------------------------------
-    with st.expander("🧹 1. Data Cleaning & Preparation — Click to View"):
-
-        st.write("### 🔧 Transformations Applied:")
-
-        # --- 1.1 Datetime cleaning
-        if 'datetime' in df.columns:
-            st.write("- Converting `datetime` into proper timestamp format")
-            df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
-
-        # --- 1.2 Trim string columns
-        st.write("- Trimming whitespace from string columns")
-        for col in df.select_dtypes(include="object").columns:
-            df[col] = df[col].astype(str).str.strip()
-
-        # --- 1.3 Missing values
-        st.write("- Filling missing values (forward + backward fill)")
-        df = df.fillna(method='ffill').fillna(method='bfill')
-
-        # --- 1.4 Feature engineering
-        if 'datetime' in df.columns:
-            st.write("- Extracting `hour`, `day`, `month` from datetime")
-            df['hour'] = df['datetime'].dt.hour
-            df['day'] = df['datetime'].dt.day_name()
-            df['month'] = df['datetime'].dt.month
-
-        st.success("Data Cleaning Completed ✔")
+    # ---------------------------------------------------------------------
+    # SECTION 1 – DATA CLEANING (Expandable)
+    # ---------------------------------------------------------------------
+    with st.expander("🧹 1. Data Cleaning & Preparation (Click to View)"):
+        st.write("### ➤ Raw Data")
         st.dataframe(df.head())
 
-    st.write("---")
+        # -------------------- CLEANING --------------------
+        cleaning_steps = []
 
-    # -----------------------------------------------------------
-    # 2. WORST TIME OF DAY & WORST 5 AREAS (CLICKABLE)
-    # -----------------------------------------------------------
-    with st.expander("⏱ 2. Worst Time of Day & Worst 5 Areas — Click to View"):
+        # Convert timestamp
+        if "timestamp" in df.columns:
+            df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+            cleaning_steps.append("Converted 'timestamp' to datetime")
 
-        # --- hourly analysis
-        if has_columns(df, ['hour', 'traffic', 'pollution']):
-            st.write("### 🔥 Worst Hours Based on Traffic")
+        # Strip strings
+        for col in df.select_dtypes(include="object").columns:
+            df[col] = df[col].astype(str).str.strip()
+            cleaning_steps.append(f"Cleaned extra spaces in column '{col}'")
 
-            hourly = df.groupby('hour')[['traffic', 'pollution']].mean()
-            st.dataframe(hourly.sort_values('traffic', ascending=False).head())
+        # Remove duplicates
+        before = len(df)
+        df = df.drop_duplicates()
+        after = len(df)
+        cleaning_steps.append(f"Removed {before-after} duplicate rows")
 
+        # Final data view
+        st.write("### ➤ Cleaning Steps Applied")
+        for step in cleaning_steps:
+            st.write("✔", step)
+
+        st.write("### ➤ Cleaned Dataset Preview")
+        st.dataframe(df.head())
+
+    # ---------------------------------------------------------------------
+    # SECTION 2 – WORST TIME OF DAY & TOP 5 WORST AREAS
+    # ---------------------------------------------------------------------
+    with st.expander("⏰ 2. Worst Time of Day & Worst 5 Areas"):
+        if "timestamp" in df.columns and "severity" in df.columns:
+            df["hour"] = df["timestamp"].dt.hour
+
+            worst_time = df.groupby("hour")["severity"].mean().sort_values(ascending=False)
+            st.write("### ⏱ Worst Hours of the Day (By Severity)")
+            st.bar_chart(worst_time)
+
+        else:
+            st.warning("Missing 'timestamp' or 'severity' column.")
+
+        if "area" in df.columns and "severity" in df.columns:
+            worst_areas = df.groupby("area")["severity"].mean().nlargest(5)
+            st.write("### 🛑 Worst 5 Areas (By Severity)")
+            st.bar_chart(worst_areas)
+        else:
+            st.warning("Missing 'area' or 'severity' column.")
+
+    # ---------------------------------------------------------------------
+    # SECTION 3 – WEATHER IMPACT ANALYSIS
+    # ---------------------------------------------------------------------
+    with st.expander("🌧 3. Weather Impact Analysis"):
+        if "weather" in df.columns and "severity" in df.columns:
+            st.write("### 📊 Severity by Weather Type")
+            weather_impact = df.groupby("weather")["severity"].mean().sort_values(ascending=False)
+            st.bar_chart(weather_impact)
+        else:
+            st.warning("Missing 'weather' or 'severity' column.")
+
+    # ---------------------------------------------------------------------
+    # SECTION 4 – VISUALIZATION GALLERY (3 REQUIRED PLOTS)
+    # ---------------------------------------------------------------------
+    with st.expander("📈 Visualization Gallery (3 Required Charts)"):
+
+        # 1. Timestamp vs Speed
+        st.write("### 1️⃣ Timestamp vs Speed (speed_kmph)")
+        if "timestamp" in df.columns and "speed_kmph" in df.columns:
             fig, ax = plt.subplots()
-            hourly.plot(kind='bar', ax=ax)
-            ax.set_title("Hourly Traffic & Pollution")
+            ax.plot(df["timestamp"], df["speed_kmph"])
+            ax.set_xlabel("Timestamp")
+            ax.set_ylabel("Speed (kmph)")
             st.pyplot(fig)
         else:
-            st.warning("Missing columns: hour / traffic / pollution")
+            st.warning("Missing 'timestamp' or 'speed_kmph'.")
 
-        # --- area analysis
-        if has_columns(df, ['area', 'traffic']):
-            st.write("### 🚨 Worst 5 Areas by Traffic")
+        # 2. Weather vs Incident Type
+        st.write("### 2️⃣ Weather vs Incident Type")
+        if "weather" in df.columns and "incident_type" in df.columns:
+            incident = df.groupby("weather")["incident_type"].count()
 
-            area_stats = df.groupby('area')[['traffic', 'pollution']].mean()
-            worst_areas = area_stats.sort_values(by='traffic', ascending=False).head(5)
-
-            st.dataframe(worst_areas)
-
-            fig2, ax2 = plt.subplots()
-            worst_areas.plot(kind='bar', ax=ax2)
-            ax2.set_title("Worst 5 Areas")
-            st.pyplot(fig2)
+            fig, ax = plt.subplots()
+            incident.plot(kind="bar", ax=ax)
+            ax.set_ylabel("Incident Count")
+            st.pyplot(fig)
         else:
-            st.warning("Missing columns: area / traffic / pollution")
+            st.warning("Missing 'weather' or 'incident_type'.")
 
-    st.write("---")
-
-    # -----------------------------------------------------------
-    # 3. WEATHER IMPACT ANALYSIS (CLICKABLE)
-    # -----------------------------------------------------------
-    with st.expander("🌧 3. Weather Impact Analysis — Click to View"):
-
-        if has_columns(df, ['rain', 'traffic']):
-            st.write("### 🌧 Rain vs Traffic")
-            fig, ax = plt.subplots()
-            ax.scatter(df['rain'], df['traffic'])
-            ax.set_xlabel("Rainfall")
-            ax.set_ylabel("Traffic")
-            st.pyplot(fig)
-
-        if has_columns(df, ['rain', 'pollution']):
-            st.write("### 💨 Rain vs Pollution")
-            fig, ax = plt.subplots()
-            ax.scatter(df['rain'], df['pollution'])
-            ax.set_xlabel("Rainfall")
-            ax.set_ylabel("Pollution")
-            st.pyplot(fig)
-
-        if not has_columns(df, ['rain']):
-            st.warning("Missing column: rain")
-
-    st.write("---")
-
-    # -----------------------------------------------------------
-    # 4. VISUALIZATION GALLERY (CLICKABLE)
-    # -----------------------------------------------------------
-    with st.expander("📊 Visualization Gallery (3+ Charts) — Click to View"):
-
-        # --- Chart 1: Traffic vs Pollution
-        if has_columns(df, ['traffic', 'pollution']):
-            st.write("### 📈 Traffic vs Pollution Trend")
-            fig, ax = plt.subplots()
-            ax.plot(df['traffic'], label='Traffic')
-            ax.plot(df['pollution'], label='Pollution')
-            ax.legend()
-            st.pyplot(fig)
-
-        # --- Chart 2: Traffic Histogram
-        if has_columns(df, ['traffic']):
-            st.write("### 📉 Traffic Distribution Histogram")
-            fig, ax = plt.subplots()
-            df['traffic'].plot(kind='hist', bins=30, ax=ax)
-            st.pyplot(fig)
-
-        # --- Chart 3: Area-wise Pollution
-        if has_columns(df, ['area', 'pollution']):
-            st.write("### 🗺 Area-wise Pollution")
-            area_plot = df.groupby('area')['pollution'].mean()
+        # 3. Travel Delay vs Road Type
+        st.write("### 3️⃣ Travel Delay vs Road Type")
+        if "travel_delay_minutes" in df.columns and "road_type" in df.columns:
+            delay_plot = df.groupby("road_type")["travel_delay_minutes"].mean()
 
             fig, ax = plt.subplots()
-            area_plot.plot(kind='bar', ax=ax)
+            delay_plot.plot(kind="bar", ax=ax)
+            ax.set_ylabel("Avg Travel Delay (minutes)")
             st.pyplot(fig)
-
-        # --- Chart 4: Rain Trend
-        if has_columns(df, ['rain']):
-            st.write("### 🌧 Rainfall Trend")
-            fig, ax = plt.subplots()
-            ax.plot(df['rain'])
-            ax.set_ylabel("Rain")
-            st.pyplot(fig)
+        else:
+            st.warning("Missing 'travel_delay_minutes' or 'road_type'.")
 
 else:
-    st.info("👆 Upload a CSV file to begin analysis.")
-
+    st.info("Please upload a CSV file to start analysis.")
