@@ -162,3 +162,4 @@ if uploaded_file is not None:
 
 else:
     st.info("👆 Upload a CSV file to begin analysis.")
+
